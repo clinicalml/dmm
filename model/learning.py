@@ -7,7 +7,7 @@ from theano import config
 
 def learn(dmm, dataset, mask, epoch_start=0, epoch_end=1000, 
           batch_size=200, shuffle=True, savefreq=None, savefile = None, 
-          dataset_eval = None, mask_eval = None, replicate_K = None,
+          dataset_eval = None, mask_eval = None, replicate_K =None,
           normalization = 'frame'):
     """
                                             Train DMM
@@ -61,7 +61,10 @@ def learn(dmm, dataset, mask, epoch_start=0, epoch_end=1000,
                 dmm._p(('Bnum: %d, Batch Bound: %.4f, |w|: %.4f, |dw|: %.4f, |w_opt|: %.4f')%(bnum,bval,p_norm, g_norm, opt_norm)) 
                 dmm._p(('-veCLL:%.4f, KL:%.4f, anneal:%.4f')%(negCLL, KL, anneal))
         if normalization=='frame':
-            bound /= (float(mask.sum())/replicate_K)
+            val =mask.sum()
+            if replicate_K is not None:
+                val/=float(replicate_K)
+            bound /= float(val)
         elif normalization=='sequence':
             bound /= float(N)
         else:
