@@ -33,12 +33,12 @@ if os.path.exists(reloadFile):
     assert os.path.exists(pfile),pfile+' not found. Need paramfile'
     print 'Reloading trained model from : ',reloadFile
     print 'Assuming ',pfile,' corresponds to model'
-    dkf  = DMM(params, paramFile = pfile, reloadFile = reloadFile) 
+    dmm  = DMM(params, paramFile = pfile, reloadFile = reloadFile) 
 else:
     pfile= params['savedir']+'/'+params['unique_id']+'-config.pkl'
     print 'Training model from scratch. Parameters in: ',pfile
-    dkf  = DMM(params, paramFile = pfile)
-displayTime('Building dkf',start_time, time.time())
+    dmm  = DMM(params, paramFile = pfile)
+displayTime('Building dmm',start_time, time.time())
 
 savef     = os.path.join(params['savedir'],params['unique_id']) 
 print 'Savefile: ',savef
@@ -56,9 +56,9 @@ savedata = DMM_learn.learn(dmm, dataset['train'], dataset['mask_train'],
                                 )
 displayTime('Running DMM',start_time, time.time()         )
 
-dkf = None
+dmm = None
 """
-Load the best DKF based on the validation error
+Load the best DMM based on the validation error
 """
 epochMin, valMin, idxMin = getLowestError(savedata['valid_bound'])
 reloadFile= pfile.replace('-config.pkl','')+'-EP'+str(int(epochMin))+'-params.npz'
