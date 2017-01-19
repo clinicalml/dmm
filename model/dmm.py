@@ -48,10 +48,6 @@ class DMM(BaseModel, object):
                     dim_input = self.params['dim_stochastic']
                 npWeights['p_trans_W_'+str(l)] = self._getWeight((dim_input, dim_output))
                 npWeights['p_trans_b_'+str(l)] = self._getWeight((dim_output,))
-            if self.params['use_prev_input']:
-                npWeights['p_trans_W_0'] = self._getWeight((DIM_STOCHASTIC+self.params['dim_observations'],
-                                                                DIM_HIDDEN_TRANS))
-                npWeights['p_trans_b_0'] = self._getWeight((DIM_HIDDEN_TRANS,))
             MU_COV_INP = DIM_HIDDEN_TRANS
         elif self.params['transition_type']=='simple_gated':
             DIM_HIDDEN_TRANS = DIM_HIDDEN*2
@@ -63,12 +59,6 @@ class DMM(BaseModel, object):
             npWeights['p_z_b_0'] = self._getWeight((DIM_HIDDEN_TRANS,))
             npWeights['p_z_W_1'] = self._getWeight((DIM_HIDDEN_TRANS, DIM_STOCHASTIC))
             npWeights['p_z_b_1'] = self._getWeight((DIM_STOCHASTIC,))
-            if self.params['use_prev_input']:
-                npWeights['p_z_W_0'] = self._getWeight((DIM_STOCHASTIC+self.params['dim_observations'], DIM_HIDDEN_TRANS))
-                npWeights['p_z_b_0'] = self._getWeight((DIM_HIDDEN_TRANS,))
-                npWeights['p_gate_embed_W_0'] = self._getWeight((DIM_STOCHASTIC+self.params['dim_observations'],
-                                                                DIM_HIDDEN_TRANS))
-                npWeights['p_gate_embed_b_0'] = self._getWeight((DIM_HIDDEN_TRANS,))
             MU_COV_INP = DIM_STOCHASTIC
         else:
             assert False,'Invalid transition type: '+self.params['transition_type']
@@ -102,13 +92,6 @@ class DMM(BaseModel, object):
                 npWeights['p_emis_b_'+str(l)] = self._getWeight((dim_output,))
             dim_res_out = self.params['dim_observations']
             npWeights['p_res_W'] = self._getWeight((self.params['dim_stochastic'], dim_res_out))
-        elif self.params['emission_type'] =='conditional':
-            for l in range(self.params['emission_layers']):
-                dim_input,dim_output = DIM_HIDDEN, DIM_HIDDEN
-                if l==0:
-                    dim_input = self.params['dim_stochastic']+self.params['dim_observations']
-                npWeights['p_emis_W_'+str(l)] = self._getWeight((dim_input, dim_output))
-                npWeights['p_emis_b_'+str(l)] = self._getWeight((dim_output,))
         else:
             assert False, 'Invalid emission type: '+str(self.params['emission_type'])
         if self.params['data_type']=='binary':
@@ -180,10 +163,6 @@ class DMM(BaseModel, object):
         if self.params['emission_type'] in ['mlp','res']:
             self._p('EMISSION TYPE: MLP or RES')
             hid = z
-        elif self.params['emission_type']=='conditional':
-            self._p('EMISSION TYPE: conditional')
-            X_prev  = T.concatenate([T.zeros_like(X[:,[0],:]),X[:,:-1,:]],axis=1)
-            hid     = T.concatenate([z,X_prev],axis=2)
         else:
             assert False,'Invalid emission type'
         for l in range(self.params['emission_layers']):
@@ -216,8 +195,6 @@ class DMM(BaseModel, object):
             
             gateInp= z
             X_prev = None
-            if self.params['use_prev_input']:
-                X_prev = T.concatenate([T.zeros_like(X[:,[0],:]),X[:,:-1,:]],axis=1)
             gate   = T.nnet.sigmoid(mlp(gateInp, self.tWeights['p_gate_embed_W_0'], self.tWeights['p_gate_embed_b_0'], 
                                         self.tWeights['p_gate_embed_W_1'],self.tWeights['p_gate_embed_b_1'],
                                         X_prev = X_prev))
@@ -229,9 +206,6 @@ class DMM(BaseModel, object):
             return mu,cov
         elif self.params['transition_type']=='mlp':
             hid = z
-            if self.params['use_prev_input']:
-                X_prev = T.concatenate([T.zeros_like(X[:,[0],:]),X[:,:-1,:]],axis=1)
-                hid    = T.concatenate([hid,X_prev],axis=2)
             for l in range(self.params['transition_layers']):
                 hid = self._LinearNL(self.tWeights['p_trans_W_'+str(l)],self.tWeights['p_trans_b_'+str(l)],hid)
             mu     = T.dot(hid, self.tWeights['p_trans_W_mu']) + self.tWeights['p_trans_b_mu']
@@ -457,13 +431,9 @@ class DMM(BaseModel, object):
         eval_inputs = [eval_z_q]
         self.likelihood          = theano.function(fxn_inputs, ll_estimate, name = 'Importance Sampling based likelihood')
         self.evaluate            = theano.function(fxn_inputs, eval_cost, name = 'Evaluate Bound')
-        if self.params['use_prev_input']:
-            eval_inputs.append(X)
         self.transition_fxn      = theano.function(eval_inputs,[eval_mu_trans, eval_logcov_trans],
                                                        name='Transition Function')
         emission_inputs = [eval_z_q]
-        if self.params['emission_type']=='conditional':
-            emission_inputs.append(X)
         self.emission_fxn = theano.function(emission_inputs, eval_obs_params[0], name='Emission Function')
         self.posterior_inference = theano.function(fxn_inputs, 
                                                    [eval_z_q, eval_mu_q, eval_logcov_q],
