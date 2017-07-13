@@ -7,7 +7,7 @@ from parse_args import params
 from utils.misc import removeIfExists,createIfAbsent,mapPrint,saveHDF5,displayTime,getLowestError
 
 if params['dataset']=='':
-    params['dataset']='jsb'
+    params['dataset'] = 'jsb'
 dataset = loadDataset(params['dataset'])
 params['savedir']+='-'+params['dataset']
 createIfAbsent(params['savedir'])
@@ -18,9 +18,9 @@ for k in ['dim_observations','dim_actions','data_type']:
 mapPrint('Options: ',params)
 
 start_time = time.time()
-from   model.dmm import DMM
-import model.learning as DMM_learn
-import model.evaluate as DMM_evaluate
+from   model_th.dmm import DMM
+import model_th.learning as DMM_learn
+import model_th.evaluate as DMM_evaluate
 displayTime('import DMM',start_time, time.time())
 dmm = None
 
@@ -55,35 +55,15 @@ savedata = DMM_learn.learn(dmm, dataset['train'], dataset['mask_train'],
                                 shuffle    = False
                                 )
 displayTime('Running DMM',start_time, time.time()         )
-
 dmm = None
-"""
-Load the best DMM based on the validation error
-"""
+""" Load the best DMM based on the validation error """
 epochMin, valMin, idxMin = getLowestError(savedata['valid_bound'])
 reloadFile= pfile.replace('-config.pkl','')+'-EP'+str(int(epochMin))+'-params.npz'
 print 'Loading from : ',reloadFile
-params['validate_only'] = True
-dmm_best   = DMM(params, paramFile = pfile, reloadFile = reloadFile)
-additional = {}
+params['validate_only']          = True
+dmm_best                         = DMM(params, paramFile = pfile, reloadFile = reloadFile)
+additional                       = {}
 savedata['bound_test_best']      = DMM_evaluate.evaluateBound(dmm_best,  dataset['test'], dataset['mask_test'], S = 2, batch_size = params['batch_size'], additional =additional) 
-savedata['bound_tsbn_test_best'] = additional['tsbn_bound']
 savedata['ll_test_best']         = DMM_evaluate.impSamplingNLL(dmm_best, dataset['test'], dataset['mask_test'], S = 2000, batch_size = params['batch_size'])
 saveHDF5(savef+'-final.h5',savedata)
 print 'Experiment Name: <',params['expt_name'],'> Test Bound: ',savedata['bound_test_best'],' ',savedata['bound_tsbn_test_best'],' ',savedata['ll_test_best']
-
-with open(params['dataset']+'-results.txt','a') as f:
-    while True:
-        try:
-            fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            break
-        except IOError as e:
-            if e.errno != errno.EAGAIN:
-                raise
-            else:
-                time.sleep(0.1)
-    f.write('Experiment Name: <'+params['expt_name']+'> Test Bound: '+str(savedata['bound_test_best'])+' '+str(savedata['bound_tsbn_test_best'])+' '+str(savedata['ll_test_best'])+'\n')
-    fcntl.flock(f, fcntl.LOCK_UN)
-
-if 'nyu.edu' in socket.gethostname():
-    import ipdb;ipdb.set_trace()
