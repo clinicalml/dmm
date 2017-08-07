@@ -13,7 +13,7 @@ parser.add_argument('-dset','--dataset', default='jsb',action='store')
 parser.add_argument('-ngpu','--num_gpus', default=4,action='store',type=int)
 args = parser.parse_args()
 
-#MAIN FLAGS
+#Main Flags 
 onHPC        = args.onHPC
 DATASET      = args.dataset 
 THFLAGS      = 'THEANO_FLAGS="lib.cnmem=1.,scan.allow_gc=False,compiledir_format=gpu<rand_idx>" ' 

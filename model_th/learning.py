@@ -26,7 +26,16 @@ def learn(dmm, dataset, epoch_start=0, epoch_end=1000,
         bound = 0
         for bnum, batch_idx in enumerate(batchlist):
             batch_idx  = batchlist[bnum]
+            #print bnum,'\n'.join(['%.4f'%np.linalg.norm((dmm.tWeights[k]*1.).eval())+' '+k for k in dmm.tWeights])
+            #if np.any(np.isnan(np.array([np.linalg.norm((dmm.tWeights[k]*1.).eval()) for k in dmm.tWeights]))):
+            #    import ipdb;ipdb.set_trace()
+            #if bnum==5:
+            #    import ipdb;ipdb.set_trace()
             batch_bound, p_norm, g_norm, opt_norm, negCLL, KL, anneal = dmm.train_debug(idx=batch_idx)
+            if np.any(np.isnan(np.array([batch_bound, p_norm, g_norm, opt_norm, negCLL, KL, anneal]))):
+                import ipdb;ipdb.set_trace()
+            #if np.any(np.isnan(np.array([np.linalg.norm((dmm.tWeights[k]*1.).eval()) for k in dmm.tWeights]))):
+            #    import ipdb;ipdb.set_trace()
             bound  += batch_bound
             ### Display ###
             if epoch%epfreq==0 and bnum%10==0:
