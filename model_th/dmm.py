@@ -34,33 +34,25 @@ class DMM(BaseModel, object):
         """ Create weights/params for generative model """
         npWeights['B_mu_W']  = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
         npWeights['B_cov_W'] = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
-        DIM_HIDDEN     = self.params['dim_hidden']
-        DIM_STOCHASTIC = self.params['dim_stochastic']
-        DIM_HIDDEN_TRANS = DIM_HIDDEN
-        #Transition Function [MLP]
+        DIM_HIDDEN           = self.params['dim_hidden']
+        DIM_STOCHASTIC       = self.params['dim_stochastic']
+        DIM_HIDDEN_TRANS     = DIM_HIDDEN
+
+        """ Transition Function """
         for l in range(self.params['transition_layers']):
             dim_input, dim_input_act, dim_output = DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS
             if l==0:
                 dim_input     = self.params['dim_stochastic']
-                dim_input_act = self.params['dim_actions']
             npWeights['p_trans_W_'+str(l)] = self._getWeight((dim_input, dim_output))
             npWeights['p_trans_b_'+str(l)] = self._getWeight((dim_output,))
-            if self.params['dim_actions']>0:
-                npWeights['p_trans_W_act_'+str(l)] = self._getWeight((dim_input_act, dim_output))
-                npWeights['p_trans_b_act_'+str(l)] = self._getWeight((dim_output,))
         MU_COV_INP, MU_COV_INP_ACT= DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS*2
         if self.params['transition_layers']==0:
             MU_COV_INP     = self.params['dim_stochastic']
-            MU_COV_INP_ACT = self.params['dim_actions']+self.params['dim_stochastic']
         npWeights['p_trans_W_mu']  = 0.1*self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
         npWeights['p_trans_b_mu']  = 0.1*self._getWeight((self.params['dim_stochastic'],))
         npWeights['p_trans_W_cov'] = 0.1*self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
         npWeights['p_trans_b_cov'] = 0.1*self._getWeight((self.params['dim_stochastic'],))
-        if self.params['dim_actions']>0:
-            npWeights['p_trans_W_act_mu']   = 0.1*self._getWeight((MU_COV_INP_ACT, self.params['dim_stochastic']))
-            npWeights['p_trans_b_act_mu']   = 0.1*self._getWeight((self.params['dim_stochastic'],))
-            npWeights['p_trans_W_act_cov']  = 0.1*self._getWeight((MU_COV_INP_ACT, self.params['dim_stochastic']))
-            npWeights['p_trans_b_act_cov']  = 0.1*self._getWeight((self.params['dim_stochastic'],))
+
         """ Emission Function parameters """
         for l in range(self.params['emission_layers']):
             dim_input,dim_output  = DIM_HIDDEN, DIM_HIDDEN
@@ -103,9 +95,6 @@ class DMM(BaseModel, object):
             DIM_INPUT = self.params['dim_stochastic']
             npWeights['q_W_st'] = self._getWeight((DIM_INPUT, self.params['rnn_size']))
             npWeights['q_b_st'] = self._getWeight((self.params['rnn_size'],))
-            if self.params['dim_actions']>0:
-                npWeights['q_W_act'] = self._getWeight((self.params['dim_actions'], self.params['rnn_size']))
-                npWeights['q_b_act'] = self._getWeight((self.params['rnn_size'],))
         RNN_SIZE = self.params['rnn_size']
         npWeights['q_W_mu']       = self._getWeight((RNN_SIZE, self.params['dim_stochastic']))
         npWeights['q_b_mu']       = self._getWeight((self.params['dim_stochastic'],))
@@ -460,12 +449,7 @@ class DMM(BaseModel, object):
             hidden_state  = h_r
         else:
             raise ValueError('Bad inference model')
-        if self.params['dim_actions']>0: 
-            assert U is not None,'expecting U' 
-            assert self.params['dim_actions']>0,'non 0 actions'
-            z_q, mu_q, cov_q  = self._aggregateLSTM_U(hidden_state, B = B, U = U, anneal = anneal)
-        else:
-            z_q, mu_q, cov_q  = self._aggregateLSTM(hidden_state, B = B, anneal = anneal)
+        z_q, mu_q, cov_q  = self._aggregateLSTM(hidden_state, B = B, anneal = anneal)
         return z_q, mu_q, cov_q
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
 
@@ -490,15 +474,7 @@ class DMM(BaseModel, object):
             self._p('Original dim: '+dim_str)
         newX, newM = dataset['features']['tensor'].astype(config.floatX), dataset['features']['obs_tensor'].astype(config.floatX)
         newB       = dataset['baselines']['tensor'].astype(config.floatX)
-        if self.params['dim_actions'] > 0:
-            newU       = dataset['treatments']['tensor']
-            if newU.__class__.__name__ == 'ndarray': 
-                newU   = newU.astype(config.floatX)
-            else:
-                newU   = newU.toarray().astype(config.floatX)
-            self.setData(newX=newX, newMask = newM, newB = newB, newU = newU, newTmask = maxTmask)
-        else:
-            self.setData(newX=newX, newMask = newM, newB = newB, newTmask = maxTmask)
+        self.setData(newX=newX, newMask = newM, newB = newB, newTmask = maxTmask)
         if not quiet:
             dimlist = self.dimData()
             dim_str = ','.join([str(d) for d in dimlist])
@@ -529,22 +505,12 @@ class DMM(BaseModel, object):
         B                = self.dataset_b[idx]
         M                = self.mask[idx]
         maxTmask         = self.maskT[idx]
-        U, self.dataset_u = None, None
-        if self.params['dim_actions']>0:
-            U_init         = np.random.uniform(0,1,size=(3,5,self.params['dim_actions'])).astype(config.floatX)
-            self.dataset_u = theano.shared(U_init)
-            U              = self.dataset_u[idx]
 
         newX, newMask, newB= T.tensor3('newX',dtype=config.floatX), T.tensor3('newMask',dtype=config.floatX), T.matrix('newB',dtype=config.floatX)
         newTmask           = T.matrix('newTmask',dtype=config.floatX)
         inputs_set         = [newX, newMask, newB, newTmask] 
         updates_set        = [(self.dataset,newX), (self.mask,newMask), (self.dataset_b, newB), (self.maskT, newTmask)]
         outputs_dim        = [self.dataset.shape, self.mask.shape, self.dataset_b.shape, self.maskT.shape]  
-        if self.params['dim_actions']>0:
-            newU           = T.tensor3('newU',dtype=config.floatX)
-            inputs_set.append(newU)
-            updates_set.append((self.dataset_u, newU))
-            outputs_dim.append(self.dataset_u.shape)
         self.setData       = theano.function(inputs_set, None, updates=updates_set)
         self.dimData       = theano.function([],outputs_dim)
 
@@ -595,60 +561,9 @@ class DMM(BaseModel, object):
         X.name = 'X'
         B.name = 'B'
         maxTmask.name = 'maxT'
-	if self.params['dim_actions']>0:
-            U.name = 'U'
-            self.transition_fxn = theano.function([evaldict['z_q'], U], [evaldict['mu_t'], evaldict['cov_t']], name='Transition Function', allow_input_downcast=True)
-            self.posterior_inference_data = theano.function([X,B,U,maxTmask], [evaldict['z_q'], evaldict['mu_q'], 
+        self.transition_fxn = theano.function([evaldict['z_q']], [evaldict['mu_t'], evaldict['cov_t']], name='Transition Function',allow_input_downcast=True)
+        self.posterior_inference_data = theano.function([X,B,maxTmask], [evaldict['z_q'], evaldict['mu_q'], 
                 evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
-	else:
-            self.transition_fxn = theano.function([evaldict['z_q']], [evaldict['mu_t'], evaldict['cov_t']], name='Transition Function',allow_input_downcast=True)
-            self.posterior_inference_data = theano.function([X,B,maxTmask], [evaldict['z_q'], evaldict['mu_q'], 
-                evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
-        """
-        Importance Sampling Estimator
-        """
-        S                = T.iscalar(name='S')
-        S.tag.test_value = 100
-        #imp-sampling-mean-sum-exp
-        def meanSumExp(mat,axis=-1):
-            a = T.max(mat, axis=axis, keepdims=True)
-            return a + T.log(T.mean(T.exp(mat-a),axis=axis,keepdims=True))
-        def llEstimate(X, mu, cov, S, B, M, U=None):
-            #first 
-            mu_rep       = mu[:,:,None,:].repeat(S,axis=2)
-            cov_rep      = cov[:,:,None,:].repeat(S,axis=2)
-            X_repeat     = X[:,:,None,:].repeat(S,axis=2)
-            z_rep        = mu_rep + T.sqrt(cov_rep)*self.srng.normal(size=cov_rep.shape)
-            U_repeat     = None
-            if U is not None:
-                U_repeat = U[:,:,None,:].repeat(S,axis=2)
-            mu_trans, cov_trans= self._transition(z_rep, U = U_repeat)
-            """ Initial prior distribution """
-            B_mu               = T.dot(B, self.tWeights['B_mu_W'])[:,None,None,:].repeat(S,axis=2) 
-            B_cov              = T.nnet.softplus(T.dot(B, self.tWeights['B_cov_W']))[:,None,None,:].repeat(S,axis=2)
-            if self.params['fixed_init_prior']:
-                B_mu = B_mu*0.
-                B_cov= B_cov*0.+1.
-            mu_prior           = T.concatenate([B_mu, mu_trans[:,:-1,:,:]], axis=1)
-            cov_prior          = T.concatenate([B_cov,cov_trans[:,:-1,:,:]],axis=1)
-            ll_prior     = self._llGaussian(z_rep, mu_prior, T.log(cov_prior))
-            ll_posterior = self._llGaussian(z_rep, mu_rep, T.log(cov_rep))
-            hid_out      = self._emission(z_rep)
-            M_repeat     = M[:,:,None,:].repeat(S, axis=2)
-            nll_tens     = self._nll_mixed(hid_out, X_repeat, mask=M_repeat, ftypes = self.params['feature_types'])
-            #Importance sampling estimation - sum along dimensions
-            ll_estimate_s= (-1*nll_tens.swapaxes(3,2).sum(2)+ll_prior.swapaxes(3,2).sum(2)-ll_posterior.swapaxes(3,2).sum(2))
-            ll_sum_t     = ll_estimate_s.sum(1)
-            ll_estimate  = meanSumExp(ll_sum_t).squeeze()
-            return ll_estimate
-        #Here, mu/logcov estimated using inference network 
-        _, mu, cov        = self._q_z_x(X, U= U, B=B, maxTmask = maxTmask, dropout_prob =0.)
-        ll_estimate       = llEstimate(X, mu, cov, S, B, M, U=U)
-        inputs_ll         = [S, X, B, M, maxTmask]
-        if self.params['dim_actions']>0:
-            inputs_ll.append(U)
-        self.likelihood_data   = theano.function(inputs_ll, ll_estimate, allow_input_downcast=True)
-        self.likelihood        = theano.function([idx, S], ll_estimate.sum(), allow_input_downcast=True)
         self._p('Completed DMM setup')
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
 if __name__=='__main__':
