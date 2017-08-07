@@ -24,7 +24,7 @@ and the model's reconstruction of it. This loss function is minimized using grad
 ### Parameter Estimation: More technical
 
 * ***Step 1***: Create model parameters
-    * The function [`_createParams(self)`](dmm.py#29-L33) calls subfunctions `_createInferenceParams` and `_createGenerativeParams` to randomly initialize the numpy matrices
+    * The function [`_createParams(self)`](dmm.py#L29-L33) calls subfunctions `_createInferenceParams` and `_createGenerativeParams` to randomly initialize the numpy matrices
     (of the inference network and generative model respectively) that will be estimated from data. 
     * Once the model parameters have been setup, we will use them to create the computational flow graph. 
 * ***Step 2***: Setup functions to save datasets onto the GPU
