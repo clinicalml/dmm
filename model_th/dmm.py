@@ -23,46 +23,54 @@ class DMM(BaseModel, object):
         super(DMM,self).__init__(params, paramFile=paramFile, reloadFile=reloadFile)
         assert self.params['nonlinearity']!='maxout','Maxout nonlinearity not supported'
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
-    """ Initialize parameters for inference and generative model """
+    """
+    Creating parameters for inference and generative model
+    """
     def _createParams(self):
         """ Model parameters """
         npWeights = OrderedDict()
         self._createInferenceParams(npWeights)
         self._createGenerativeParams(npWeights)
         return npWeights
+
     def _createGenerativeParams(self, npWeights):
         """ Create weights/params for generative model """
         npWeights['B_mu_W']  = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
         npWeights['B_cov_W'] = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
-        DIM_HIDDEN           = self.params['dim_hidden']
-        DIM_STOCHASTIC       = self.params['dim_stochastic']
-        DIM_HIDDEN_TRANS     = DIM_HIDDEN
 
-        """ Transition Function """
+        DIM_HIDDEN     = self.params['dim_hidden']
+        DIM_STOCHASTIC = self.params['dim_stochastic']
+
+        """
+        Transition Function _ MLP 
+        """
         for l in range(self.params['transition_layers']):
-            dim_input, dim_input_act, dim_output = DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS
+            dim_input, dim_output = DIM_HIDDEN, DIM_HIDDEN
             if l==0:
                 dim_input     = self.params['dim_stochastic']
             npWeights['p_trans_W_'+str(l)] = self._getWeight((dim_input, dim_output))
             npWeights['p_trans_b_'+str(l)] = self._getWeight((dim_output,))
-        MU_COV_INP, MU_COV_INP_ACT= DIM_HIDDEN_TRANS, DIM_HIDDEN_TRANS*2
+            if self.params['transition_type']=='gated':
+                npWeights['p_trans_gate_W_'+str(l)] = self._getWeight((dim_input, dim_output))
+                npWeights['p_trans_gate_b_'+str(l)] = self._getWeight((dim_output,))
+        MU_COV_INP = self.params['dim_hidden']
         if self.params['transition_layers']==0:
             MU_COV_INP     = self.params['dim_stochastic']
-        npWeights['p_trans_W_mu']  = 0.1*self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
-        npWeights['p_trans_b_mu']  = 0.1*self._getWeight((self.params['dim_stochastic'],))
-        npWeights['p_trans_W_cov'] = 0.1*self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
-        npWeights['p_trans_b_cov'] = 0.1*self._getWeight((self.params['dim_stochastic'],))
+        npWeights['p_trans_W_mu']  = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
+        npWeights['p_trans_b_mu']  = self._getWeight((self.params['dim_stochastic'],))
+        npWeights['p_trans_W_cov'] = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
+        npWeights['p_trans_b_cov'] = self._getWeight((self.params['dim_stochastic'],))
 
-        """ Emission Function parameters """
+        """ 
+        Emission Function 
+        """
         for l in range(self.params['emission_layers']):
             dim_input,dim_output  = DIM_HIDDEN, DIM_HIDDEN
             if l==0:
                 dim_input = self.params['dim_stochastic']
             npWeights['p_emis_W_'+str(l)] = self._getWeight((dim_input, dim_output))
             npWeights['p_emis_b_'+str(l)] = self._getWeight((dim_output,))
-        if self.params['data_type']=='mixed':
-            dim_out = np.where(self.params['feature_types']=='binary')[0].shape[0] + 2*np.where(self.params['feature_types']=='continuous')[0].shape[0]
-        elif self.params['data_type'] == 'real':
+        lif self.params['data_type'] == 'real':
             dim_out = self.params['dim_observations']*2
         elif self.params['data_type'] == 'binary':
             dim_out  = self.params['dim_observations']
@@ -82,14 +90,15 @@ class DMM(BaseModel, object):
         DIM_HIDDEN = RNN_SIZE
         DIM_STOC   = self.params['dim_stochastic']
 
-        #Embed the Input -> RNN_SIZE
+        #Step 1: Embed the Input
         dim_input, dim_output= DIM_INPUT, RNN_SIZE
         npWeights['q_W_input_0'] = self._getWeight((dim_input, dim_output))
         npWeights['q_b_input_0'] = self._getWeight((dim_output,))
 
-        #Setup weights for LSTM
+        #Step 2: Apply RNN/LSTM
         self._createLSTMWeights(npWeights)
-
+        
+        #Step 3: Parameters for combiner function
         assert self.params['inference_model'] in ['LR','R'],'Invalid inference model'
         if self.params['use_generative_prior']=='approx':
             DIM_INPUT = self.params['dim_stochastic']
@@ -106,59 +115,33 @@ class DMM(BaseModel, object):
         if self.params['inference_model']=='LR':
             suffices_to_build.append('l')
         RNN_SIZE          = self.params['rnn_size']
+        assert self.params['rnn_layers']==1,'use 1 layer rnns'
         for suffix in suffices_to_build:
             if self.params['rnn_cell']=='lstm':
-                npWeights['W_lstm_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE,RNN_SIZE*4))
-                npWeights['b_lstm_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE*4,), scheme='lstm')
-                npWeights['U_lstm_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE,RNN_SIZE*4),scheme='lstm')
+                npWeights['W_lstm_'+suffix] = self._getWeight((RNN_SIZE,RNN_SIZE*4))
+                npWeights['b_lstm_'+suffix] = self._getWeight((RNN_SIZE*4,), scheme='lstm')
+                npWeights['U_lstm_'+suffix] = self._getWeight((RNN_SIZE,RNN_SIZE*4),scheme='lstm')
             elif self.params['rnn_cell']=='rnn':
-                npWeights['W_rnn_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE,RNN_SIZE))
-                npWeights['b_rnn_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE,), scheme='lstm')
-                npWeights['U_rnn_'+suffix+'_'+str(l)] = self._getWeight((RNN_SIZE,RNN_SIZE),scheme='orthogonal')
+                npWeights['W_rnn_'+suffix] = self._getWeight((RNN_SIZE,RNN_SIZE))
+                npWeights['b_rnn_'+suffix] = self._getWeight((RNN_SIZE,), scheme='lstm')
+                npWeights['U_rnn_'+suffix] = self._getWeight((RNN_SIZE,RNN_SIZE),scheme='orthogonal')
             else:
                 raise ValueError('Invalid setting for RNN cell')
 
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
-    """
-    Generative Model 
-    """
-    def _transition(self, z, U=None, trans_params = None, anneal = 1.):
-        """
-        Transition Function for DMM
+    """ Specify the Generative Model  """
+    def _transition(self, z, trans_params = None):
+        """ Transition Function for DMM
         Input:  z [bs x T x dim]
-        Output: mu/cov [bs x T x dim]
-        """
+        Output: mu/cov [bs x T x dim] """
         if trans_params is None:
             trans_params = self.tWeights
         hid    = z
         for l in range(self.params['transition_layers']):
             hid= self._LinearNL(trans_params['p_trans_W_'+str(l)],trans_params['p_trans_b_'+str(l)],hid)
-        if U is None:
-            mu     = T.dot(hid, trans_params['p_trans_W_mu']) + trans_params['p_trans_b_mu']
-            cov    = T.nnet.softplus(T.dot(hid, trans_params['p_trans_W_cov'])+trans_params['p_trans_b_cov'])
-            return mu, cov
-        else:
-            hid_u     = U
-            for l in range(self.params['transition_layers']):
-                hid_u = self._LinearNL(trans_params['p_trans_W_act_'+str(l)], trans_params['p_trans_b_act_'+str(l)], hid_u) 
-            hid_r  = T.concatenate([anneal*hid, hid_u], axis=-1)
-            mu     = T.dot(hid_r, trans_params['p_trans_W_act_mu']) + trans_params['p_trans_b_act_mu']
-            cov    = T.nnet.softplus(T.dot(hid_r, trans_params['p_trans_W_act_cov'])+trans_params['p_trans_b_act_cov'])
-            return mu, cov
-        """
         mu     = T.dot(hid, trans_params['p_trans_W_mu']) + trans_params['p_trans_b_mu']
         cov    = T.nnet.softplus(T.dot(hid, trans_params['p_trans_W_cov'])+trans_params['p_trans_b_cov'])
-        if U is None:
-            return mu, cov
-        else:
-            hid_u     = U
-            for l in range(self.params['transition_layers']):
-                hid_u = self._LinearNL(trans_params['p_trans_W_act_'+str(l)], trans_params['p_trans_b_act_'+str(l)], hid_u) 
-            mu_u  = T.dot(hid_u, trans_params['p_trans_W_act_mu'])+trans_params['p_trans_b_act_mu']
-            cov_u = T.nnet.softplus(T.dot(hid_u, trans_params['p_trans_W_act_cov'])+trans_params['p_trans_b_act_cov'])
-            mu_f, cov_f = self._pog(mu_u, cov_u, mu, cov)
-            return mu_f, cov_f
-        """
+        return mu, cov
 
     def _emission(self, z):
         """
@@ -191,13 +174,7 @@ class DMM(BaseModel, object):
 
     def _neg_elbo(self, X, B, M, maxTmask, U = None, anneal = 1., dropout_prob = 0., additional = None):
         z_q, mu_q, cov_q   = self._q_z_x(X, U= U, B=B, maxTmask = maxTmask, dropout_prob = dropout_prob, anneal = anneal)
-        ##added fix for NaN - this should work but try something simpler first
-        #z_q_m              = z_q*maxTmask[:,:,None]   + T.zeros_like(z_q)*(1-maxTmask[:,:,None])
-        #mu_q_m             = mu_q*maxTmask[:,:,None]  + T.zeros_like(mu_q)*(1-maxTmask[:,:,None])
-        #cov_q_m            = cov_q*maxTmask[:,:,None] + T.ones_like(cov_q)*(1-maxTmask[:,:,None])
-        mu_trans, cov_trans= self._transition(z_q, U = U, anneal = anneal)
-        #mu_trans_m         = mu_trans*maxTmask[:,:,None]  + T.zeros_like(mu_trans)*(1-maxTmask[:,:,None])
-        #cov_trans_m        = cov_trans*maxTmask[:,:,None] + T.ones_like(cov_trans)*(1-maxTmask[:,:,None])
+        mu_trans, cov_trans= self._transition(z_q)
         """ Initial prior distribution """
         B_mu               = T.dot(B, self.tWeights['B_mu_W'])[:,None,:] 
         B_cov              = T.nnet.softplus(T.dot(B, self.tWeights['B_cov_W']))[:,None,:]
@@ -206,26 +183,10 @@ class DMM(BaseModel, object):
             B_cov= B_cov*0.+1.
         mu_prior           = T.concatenate([B_mu, mu_trans[:,:-1,:]], axis=1)
         cov_prior          = T.concatenate([B_cov,cov_trans[:,:-1,:]],axis=1)
-        """
-        Regularization using 
-        simulation during learning 
-        """
-        #if dropout_prob>0:
-        #    eps_prior      = self.srng.normal(size=(mu_prior.shape))
-        #    z_sim          = mu_prior + T.sqrt(cov_prior)*eps_prior
-        #    hid_out_sim    = self._emission(z_sim)
-        #    nll_mat_sim    = self._nll_mixed(hid_out_sim, X, mask=M, ftypes = self.params['feature_types'])
-        #    sim_reg        = (1-anneal)*nll_mat_sim.sum()
         KL                 = self._temporalKL(mu_q, cov_q, mu_prior, cov_prior, maxTmask = maxTmask)
         hid_out            = self._emission(z_q)
 	params             = {}
-        if self.params['data_type'] == 'mixed':
-            #Set the logcovariances to a small fixed value
-            #cont_idx       = len(np.where(self.params['feature_types']=='continuous')[0])
-            #mask_cont      = T.set_subtensor(T.ones_like(hid_out)[:,:,-cont_idx:],0)
-            #hid_out        = hid_out*(mask_cont) + np.log(0.1)*(1-mask_cont)
-            nll_mat        = self._nll_mixed(hid_out, X, mask=M, ftypes = self.params['feature_types'], params = params)
-        elif self.params['data_type'] == 'binary':
+        if self.params['data_type'] == 'binary':
             nll_mat        = self._nll_binary(hid_out, X, mask = M, params= params)
         elif self.params['data_type']=='real':
             dim_obs        = self.params['dim_observations']
@@ -265,7 +226,7 @@ class DMM(BaseModel, object):
         mu_f  = (mu_1*cov_2+mu_2*cov_1)/(cov_1+cov_2) 
         return mu_f, cov_f
 
-    def _aggregateLSTM(self, hidden_state, B = None, anneal = 1.):
+    def _aggregateLSTM(self, hidden_state):
         """
         LSTM hidden layer [T x bs x dim] 
         z [bs x T x dim], mu [bs x T x dim], cov [bs x T x dim]
@@ -286,7 +247,7 @@ class DMM(BaseModel, object):
             tParams    = OrderedDict()
             for p in params:
                 tParams[p.name] = p
-            mu_trans, cov_trans = self._transition(z_prev, trans_params = tParams, anneal = anneal)
+            mu_trans, cov_trans = self._transition(z_prev, trans_params = tParams)
             mu_t       = T.dot(h_t,tParams['q_W_mu'])+tParams['q_b_mu']
             cov_t      = T.nnet.softplus(T.dot(h_t, tParams['q_W_cov'])+tParams['q_b_cov'])
             mu_f, cov_f= self._pog(mu_trans, cov_trans, mu_t, cov_t)
@@ -312,59 +273,7 @@ class DMM(BaseModel, object):
         z, mu, cov  = rval[0].swapaxes(0,1), rval[1].swapaxes(0,1), rval[2].swapaxes(0,1)
         return z, mu, cov
 
-
-    def _aggregateLSTM_U(self, hidden_state, U=None, B = None, anneal = 1.):
-        assert U is not None,'expecting U'
-        if self.params['dim_stochastic']==1:
-            raise ValueError('dim_stochastic must be larger than 1 dimension')
-        """
-        Use the true prior
-            * Gradients for predicting z_2 will be propagated 
-        """
-        def st_true(h_t, eps_t, u_t, z_prev, *params):
-            tParams = {}
-            for p in params:
-                tParams[p.name] = p
-            mu_trans, cov_trans = self._transition(z_prev, U=u_t, trans_params=tParams, anneal = anneal)
-            mu_t       = T.dot(h_t,tParams['q_W_mu'])+tParams['q_b_mu']
-            cov_t      = T.nnet.softplus(T.dot(h_t,tParams['q_W_cov'])+tParams['q_b_cov'])
-            #POG Approximation
-            mu_f, cov_f= self._pog(mu_trans, cov_trans, mu_t, cov_t) 
-            z_f        = mu_f+T.sqrt(cov_f)*eps_t
-            return z_f, mu_f, cov_f
-        def st_approx(h_t, eps_t, u_t, z_prev, *params):
-            tParams = {}
-            for p in params:
-                tParams[p.name] = p
-            h_z        = T.tanh(T.dot(z_prev,tParams['q_W_st'])+tParams['q_b_st'])
-            h_act      = T.tanh(T.dot(u_t,tParams['q_W_act'])+tParams['q_b_act'])
-            h_next     = (1./3.)*(h_t+h_z+h_act)
-            mu_t       = T.dot(h_next,tParams['q_W_mu'])+tParams['q_b_mu']
-            cov_t      = T.nnet.softplus(T.dot(h_next,tParams['q_W_cov'])+tParams['q_b_cov'])
-            z_t        = mu_t+T.sqrt(cov_t)*eps_t
-            return z_t, mu_t, cov_t
-        # eps: [T x bs x dim_stochastic]
-        eps         = self.srng.normal(size=(hidden_state.shape[0],hidden_state.shape[1],self.params['dim_stochastic']))
-        B_mu        = T.dot(B, self.tWeights['B_mu_W'])
-        B_cov       = T.nnet.softplus(T.dot(B, self.tWeights['B_cov_W']))
-        z0          = B_mu + T.sqrt(B_cov)*self.srng.normal(size=B_mu.shape)
-        #z0          = T.zeros((eps.shape[1], self.params['dim_stochastic']))
-        if self.params['use_generative_prior']=='true':
-            non_seq = [self.tWeights[k] for k in ['q_W_mu','q_b_mu','q_W_cov','q_b_cov']]+[self.tWeights[k] for k in self.tWeights if '_trans_' in k]
-            scan_fxn=st_true
-        elif self.params['use_generative_prior']=='approx':
-            non_seq = [self.tWeights[k] for k in ['q_W_st', 'q_b_st', 'q_W_mu','q_b_mu','q_W_cov','q_b_cov','q_W_act','q_b_act']]
-            scan_fxn=st_approx 
-        else:
-            raise NotImplemented('Should not reach here')
-        rval, _     = theano.scan(scan_fxn, sequences=[hidden_state, eps, U.swapaxes(0,1)],
-                                    outputs_info=[z0, None,None],
-                                    non_sequences=non_seq,
-                                    name='structuredApproximation')
-        z, mu, cov  = rval[0].swapaxes(0,1), rval[1].swapaxes(0,1), rval[2].swapaxes(0,1)
-        return z, mu, cov
-
-    def _LSTM_RNN_layer(self, inp, suffix, temporalMask = None, dropout_prob=0., RNN_SIZE = None, init_h = None):
+    def _LSTM_RNN_layer(self, inp, suffix, temporalMask = None, dropout_prob=0., RNN_SIZE = None):
         self._p(('In _LSTM_RNN_layer with dropout %.4f')%(dropout_prob))
         assert suffix=='r' or suffix=='l','Invalid suffix: '+suffix
         def _slice(mat, n, dim):
@@ -379,18 +288,19 @@ class DMM(BaseModel, object):
             o = T.nnet.sigmoid(_slice(preact, 2, RNN_SIZE))
             c = T.tanh(_slice(preact, 3, RNN_SIZE))
             # c and h are only updated if the current time 
-            #step contains atleast one observed feature 
+            # step contains atleast an observed feature 
             obs_t = t_m_[:,None]
             c_new = f * c_ + i * c
             c = c_new*obs_t+ (1-obs_t)*c_
             h_new = o * T.tanh(c)
             h = h_new*obs_t+ (1-obs_t)*h_
-            return h, c
+
         def _rnn_layer(x_, t_m_, h_, lstm_U):
             h_next  = T.dot(h_, lstm_U) + x_
             obs_t = t_m_[:,None]
             h_out   = obs_t*(T.tanh(h_next)) + (1-obs_t)*h_
             return h_out 
+        assert self.params['rnn_layers']==1,'Only 1/2 layer LSTM supported'
         rnn_cell       = self.params['rnn_cell']
         if rnn_cell=='lstm':
             stepfxn    = _lstm_layer
@@ -399,19 +309,15 @@ class DMM(BaseModel, object):
         else:
             raise ValueError('Invalid cell: '+rnn_cell)
 
-        lstm_embed = T.dot(inp.swapaxes(0,1),self.tWeights['W_'+rnn_cell+'_'+suffix+'_0'])+ self.tWeights['b_'+rnn_cell+'_'+suffix+'_0']
+        lstm_embed = T.dot(inp.swapaxes(0,1),self.tWeights['W_'+rnn_cell+'_'+suffix])+ self.tWeights['b_'+rnn_cell+'_'+suffix]
         nsteps     = lstm_embed.shape[0]
         n_samples  = lstm_embed.shape[1]
+
         if self.params['rnn_cell']=='lstm':
             o_info = [T.zeros((n_samples,RNN_SIZE)), T.ones((n_samples,RNN_SIZE))]
         else:
             o_info = [T.zeros((n_samples,RNN_SIZE))]
-        if init_h is not None:
-            if self.params['rnn_cell']=='lstm':
-                o_info = [init_h, T.ones((n_samples,RNN_SIZE))]
-            else:
-                o_info = [init_h]
-        n_seq      = [self.tWeights['U_'+rnn_cell+'_'+suffix+'_0']]
+        n_seq      = [self.tWeights['U_'+rnn_cell+'_'+suffix]]
         lstm_input = lstm_embed
         if temporalMask is None: 
             tMask      = T.ones((nsteps, n_samples))
@@ -454,27 +360,15 @@ class DMM(BaseModel, object):
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
 
     """
-    Resetting Datasets
+    Resetting the datasets stored on the GPU
     """
-    def _setupTmask(self, mask_tensor):
-        p_obs      = (mask_tensor.sum(-1)>0.)*1.
-        maxt       = p_obs.shape[1]-np.argmax(p_obs[:,::-1],1)
-        result = []
-        for p, midx in zip(np.zeros_like(p_obs),maxt):
-            p[:midx] = 1.
-            result.append(p)
-        maxTmask   = np.array(result).astype(config.floatX)
-        return maxTmask
-
     def resetDataset(self, dataset, quiet=False):
-        maxTmask = self._setupTmask(dataset['features']['obs_tensor'])
         if not quiet:
             dimlist = self.dimData()
             dim_str = ','.join([str(d) for d in dimlist])
             self._p('Original dim: '+dim_str)
         newX, newM = dataset['features']['tensor'].astype(config.floatX), dataset['features']['obs_tensor'].astype(config.floatX)
-        newB       = dataset['baselines']['tensor'].astype(config.floatX)
-        self.setData(newX=newX, newMask = newM, newB = newB, newTmask = maxTmask)
+        self.setData(newX=newX, newMask = newM)
         if not quiet:
             dimlist = self.dimData()
             dim_str = ','.join([str(d) for d in dimlist])
@@ -482,34 +376,26 @@ class DMM(BaseModel, object):
 
     """ Building Model """
     def _buildModel(self):
-        """ High level function to build and setup theano functions """
+        """ 
+        This function contains high level function to build and setup theano functions to perform 
+        various actions within the DMM such as updating parameters using data in a batch
+        """
         idx                = T.vector('idx',dtype='int64')
         idx.tag.test_value = np.array([0,1]).astype('int64')
         X_init             = np.random.uniform(0,1,size=(3,5,self.params['dim_observations'])).astype(config.floatX)
-        """
-        Setup tags
-        """
+        """ Setup tags for debugging """
         M_init             = ((X_init>0.5)*1.).astype(config.floatX) 
         M_init[0,4:,:] = 0.
         M_init[0,1,:] = 0.
         M_init[1,2:,:] = 0.
-        maxT_init          = self._setupTmask(M_init)
-        
-        B_init             = np.random.uniform(0,1,size=(3,self.params['dim_baselines'])).astype(config.floatX)
         self.dataset       = theano.shared(X_init, name = 'X')
-        self.dataset_b     = theano.shared(B_init, name = 'B')
         self.mask          = theano.shared(M_init, name = 'M')
-        self.maskT         = theano.shared(maxT_init, name = 'maskT')
 
         X                = self.dataset[idx]
-        B                = self.dataset_b[idx]
         M                = self.mask[idx]
-        maxTmask         = self.maskT[idx]
-
-        newX, newMask, newB= T.tensor3('newX',dtype=config.floatX), T.tensor3('newMask',dtype=config.floatX), T.matrix('newB',dtype=config.floatX)
-        newTmask           = T.matrix('newTmask',dtype=config.floatX)
-        inputs_set         = [newX, newMask, newB, newTmask] 
-        updates_set        = [(self.dataset,newX), (self.mask,newMask), (self.dataset_b, newB), (self.maskT, newTmask)]
+        newX, newMask      = T.tensor3('newX',dtype=config.floatX), T.matrix('newMask',dtype=config.floatX)
+        inputs_set         = [newX, newMask]
+        updates_set        = [(self.dataset,newX), (self.mask,newMask)]
         outputs_dim        = [self.dataset.shape, self.mask.shape, self.dataset_b.shape, self.maskT.shape]  
         self.setData       = theano.function(inputs_set, None, updates=updates_set)
         self.dimData       = theano.function([],outputs_dim)
@@ -531,9 +417,6 @@ class DMM(BaseModel, object):
         if not self.params['validate_only']:
             traindict  = {}
             train_cost = self._neg_elbo(X, B, M, maxTmask, U = U, anneal = anneal, dropout_prob = self.params['rnn_dropout'], additional=traindict)
-            if self.params['time_to_death']:
-                traindict
-            #Get updates from optimizer
             model_params             = self._getModelParams()
             optimizer_up, norm_list  = self._setupOptimizer(train_cost, model_params,lr = lr,
                                                             reg_type =self.params['reg_type'],
@@ -544,26 +427,25 @@ class DMM(BaseModel, object):
             #Add annealing updates
             optimizer_up += anneal_update+self.updates
             self._p(str(len(self.updates))+' other updates')
-            ############# Setup train & evaluate functions ###########
             self.train_debug = theano.function(fxn_inputs,[train_cost,norm_list[0],norm_list[1],
-                norm_list[2], traindict['nll'], traindict['kl'], anneal.sum()], updates = optimizer_up, name='Train (with Debug)')
+                norm_list[2], traindict['nll'], traindict['kl'], anneal.sum()], updates = optimizer_up, name='Train (with Debug Outputs)')
         #Updates ack
         self.updates_ack         = True
+        """
+        Setup functions to evaluate the model
+        """
 	evaldict                 = {}
         eval_cost                = self._neg_elbo(X, B, M, maxTmask, U = U, anneal = 1., dropout_prob = 0., additional= evaldict)
         self.evaluate            = theano.function([idx], eval_cost, name = 'Evaluate Bound',allow_input_downcast=True)
         self.nll_feat            = theano.function([idx],evaldict['nll_mat'], name = 'NLL features',allow_input_downcast=True)
         self.nll_batch           = theano.function([idx],[evaldict['hid_out'],evaldict['nll_mat']], name = 'NLL batch',allow_input_downcast=True)
         self.posterior_inference = theano.function([idx], [evaldict['z_q'], evaldict['mu_q'], evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
-        self.emission_fxn        = theano.function([evaldict['z_q']], [evaldict['bin_prob'], evaldict['real_mu'], evaldict['real_logcov']] , name='Emission',allow_input_downcast=True)
-	self.init_prior          = theano.function([B],[evaldict['b_mu'],evaldict['b_cov']], name = 'Initial Prior',allow_input_downcast=True)
-        evaldict['z_q'].name     = 'Z'
-        X.name = 'X'
-        B.name = 'B'
-        maxTmask.name = 'maxT'
+        if self.params['data_type']=='binary':
+            self.emission_fxn        = theano.function([evaldict['z_q']], [evaldict['bin_prob']] , name='Emission',allow_input_downcast=True)
+        else:
+            self.emission_fxn        = theano.function([evaldict['z_q']], [evaldict['real_mu'], evaldict['real_logcov']] , name='Emission',allow_input_downcast=True)
         self.transition_fxn = theano.function([evaldict['z_q']], [evaldict['mu_t'], evaldict['cov_t']], name='Transition Function',allow_input_downcast=True)
-        self.posterior_inference_data = theano.function([X,B,maxTmask], [evaldict['z_q'], evaldict['mu_q'], 
-                evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
+        self.posterior_inference_data = theano.function([X,M], [evaldict['z_q'], evaldict['mu_q'], evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
         self._p('Completed DMM setup')
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
 if __name__=='__main__':
