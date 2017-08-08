@@ -8,10 +8,6 @@ from common_eval_utils import *
 Functions for evaluating a DMM object
 """
 
-def initialVals(dmm, dataset):
-    mu0, cov0 = dmm.init_prior(dataset['baselines']['tensor'].astype('float32'))
-    return [mu0,cov0]
-
 def infer(dmm, dataset):
     """ Posterior Inference using recognition network 
     Returns: z,mu,logcov (each a 3D tensor) 
@@ -23,8 +19,10 @@ def infer(dmm, dataset):
 def reconstruct(dmm, dataset):
     dmm.resetDataset(dataset, quiet=True)
     z, _, _ = dmm.posterior_inference(idx=np.arange(dataset['features']['tensor'].shape[0]))
-    bin_prob, mu, logcov = dmm.emission_fxn(z)
-    return bin_prob, mu, logcov
+    params = dmm.emission_fxn(z)
+    if type(params) is not list:
+        params = [params]
+    return *params
 
 def evaluateBound(dmm, dataset, batch_size=100):
     """ Evaluate ELBO """
@@ -41,22 +39,6 @@ def evaluateBound(dmm, dataset, batch_size=100):
     end_time   = time.time()
     dmm._p(('(Evaluate) Validation Bound: %.4f [Took %.4f seconds]')%(bound,end_time-start_time))
     return bound
-
-def evaluateNLL(dmm, dataset, batch_size=20):
-    """ Evaluate IS NLL"""
-    nll = 0
-    start_time  = time.time()
-    N           = dataset['features']['tensor'].shape[0]
-    dmm.resetDataset(dataset)
-    for bnum,st_idx in enumerate(range(0,N,batch_size)):
-        end_idx = min(st_idx+batch_size, N)
-        idx_data= np.arange(st_idx, end_idx)
-        batch_nll= -dmm.likelihood(idx=idx_data, S = 1000)
-        nll   += batch_nll 
-    nll /= float(dataset['features']['obs_tensor'].sum())
-    end_time   = time.time()
-    dmm._p(('NLL: %.4f [Took %.4f seconds]')%(nll,end_time-start_time))
-    return nll
 
 def sample(dmm, B, U, ftypes, nsamples=100, T=20, additional = {}, stochastic = True):
     """
@@ -93,4 +75,3 @@ def sample(dmm, B, U, ftypes, nsamples=100, T=20, additional = {}, stochastic = 
     additional['cov_sample']    = np.concatenate(covlist, axis=1)
     bin_prob, mu, logcov = dmm.emission_fxn(zvec)
     return bin_prob, mu, logcov, zvec
-
