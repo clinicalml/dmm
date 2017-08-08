@@ -56,6 +56,9 @@ class DMM(BaseModel, object):
         MU_COV_INP = self.params['dim_hidden']
         if self.params['transition_layers']==0:
             MU_COV_INP     = self.params['dim_stochastic']
+        if self.params['transition_type']=='gated':
+            npWeights['p_trans_z_W']     = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
+            npWeights['p_trans_gate_W']  = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
         npWeights['p_trans_W_mu']  = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
         npWeights['p_trans_b_mu']  = self._getWeight((self.params['dim_stochastic'],))
         npWeights['p_trans_W_cov'] = self._getWeight((MU_COV_INP,self.params['dim_stochastic']))
@@ -90,12 +93,12 @@ class DMM(BaseModel, object):
         DIM_HIDDEN = RNN_SIZE
         DIM_STOC   = self.params['dim_stochastic']
 
-        #Step 1: Embed the Input
+        #Step 1: Params for initial embedding of input 
         dim_input, dim_output= DIM_INPUT, RNN_SIZE
         npWeights['q_W_input_0'] = self._getWeight((dim_input, dim_output))
         npWeights['q_b_input_0'] = self._getWeight((dim_output,))
 
-        #Step 2: Apply RNN/LSTM
+        #Step 2: RNN/LSTM params
         self._createLSTMWeights(npWeights)
         
         #Step 3: Parameters for combiner function
@@ -115,7 +118,6 @@ class DMM(BaseModel, object):
         if self.params['inference_model']=='LR':
             suffices_to_build.append('l')
         RNN_SIZE          = self.params['rnn_size']
-        assert self.params['rnn_layers']==1,'use 1 layer rnns'
         for suffix in suffices_to_build:
             if self.params['rnn_cell']=='lstm':
                 npWeights['W_lstm_'+suffix] = self._getWeight((RNN_SIZE,RNN_SIZE*4))
@@ -129,7 +131,6 @@ class DMM(BaseModel, object):
                 raise ValueError('Invalid setting for RNN cell')
 
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
-    """ Specify the Generative Model  """
     def _transition(self, z, trans_params = None):
         """ Transition Function for DMM
         Input:  z [bs x T x dim]
@@ -137,9 +138,17 @@ class DMM(BaseModel, object):
         if trans_params is None:
             trans_params = self.tWeights
         hid    = z
+        hid_g  = z
         for l in range(self.params['transition_layers']):
             hid= self._LinearNL(trans_params['p_trans_W_'+str(l)],trans_params['p_trans_b_'+str(l)],hid)
-        mu     = T.dot(hid, trans_params['p_trans_W_mu']) + trans_params['p_trans_b_mu']
+            if self.params['transition_type']=='gated': 
+                hid_g = self._LinearNL(trans_params['p_trans_gate_W_'+str(l)],trans_params['p_trans_gate_b_'+str(l)],hid_g)
+        mu_prop= T.dot(hid, trans_params['p_trans_W_mu']) + trans_params['p_trans_b_mu']
+        if self.params['transition_type']=='gated':
+            gate   = T.nnet.sigmoid(T.dot(hid_g, trans_params['p_trans_gate_W'))
+            mu     = gate*mu_prop + (1-gate)*T.dot(z, trans_params['p_trans_z_W']) 
+        else:
+            mu     = mu_prop
         cov    = T.nnet.softplus(T.dot(hid, trans_params['p_trans_W_cov'])+trans_params['p_trans_b_cov'])
         return mu, cov
 
@@ -159,7 +168,7 @@ class DMM(BaseModel, object):
     """
     Negative ELBO [Evidence Lower Bound] 
     """
-    def _temporalKL(self, mu_q, cov_q, mu_prior, cov_prior, maxTmask):
+    def _temporalKL(self, mu_q, cov_q, mu_prior, cov_prior, mask):
         """
         KL(q_t||p_t) = 0.5*(log|sigmasq_p| -log|sigmasq_q|  -D + Tr(sigmasq_p^-1 sigmasq_q)
                         + (mu_p-mu_q)^T sigmasq_p^-1 (mu_p-mu_q))
@@ -169,27 +178,29 @@ class DMM(BaseModel, object):
         diff_mu = mu_prior-mu_q
         KL      = T.log(cov_prior)-T.log(cov_q) - 1. + cov_q/cov_prior + diff_mu**2/cov_prior
         KL_t    = 0.5*KL.sum(2)
-        KLmasked  = (KL_t*maxTmask)
+        KLmasked  = (KL_t*mask)
         return KLmasked.sum()
 
-    def _neg_elbo(self, X, B, M, maxTmask, U = None, anneal = 1., dropout_prob = 0., additional = None):
-        z_q, mu_q, cov_q   = self._q_z_x(X, U= U, B=B, maxTmask = maxTmask, dropout_prob = dropout_prob, anneal = anneal)
+    def _neg_elbo(self, X, M, anneal = 1., dropout_prob = 0., additional = None):
+        z_q, mu_q, cov_q   = self._q_z_x(X, mask = M, dropout_prob = dropout_prob, anneal = anneal)
         mu_trans, cov_trans= self._transition(z_q)
         mu_prior           = T.concatenate([T.zeros_like(mu_trans[:,[0],:]), mu_trans[:,:-1,:]], axis=1)
         cov_prior          = T.concatenate([T.ones_like(mu_trans[:,[0],:]),cov_trans[:,:-1,:]],axis=1)
-        KL                 = self._temporalKL(mu_q, cov_q, mu_prior, cov_prior, maxTmask = maxTmask)
+        KL                 = self._temporalKL(mu_q, cov_q, mu_prior, cov_prior, mask = M)
         hid_out            = self._emission(z_q)
 	params             = {}
         if self.params['data_type'] == 'binary':
             nll_mat        = self._nll_binary(hid_out, X, mask = M, params= params)
         elif self.params['data_type']=='real':
             dim_obs        = self.params['dim_observations']
-            nll_mat        = self._nll_gaussian(hid_out[:,:,:dim_obs], hid_out[:,:,dim_obs:dim_obs*2], X, mask = M, params=params)
+            mu_hid         = hid_out[:,:,:dim_obs]
+            logcov_hid     = hid_out[:,:,dim_obs:dim_obs*2]
+            nll_mat        = self._nll_gaussian(mu_hid, logcov_hid, X, mask = M, params=params)
         else:
             raise ValueError('Invalid Data Type'+str(self.params['data_type']))
         nll            = nll_mat.sum()
         #Evaluate negative ELBO
-        neg_elbo       = nll+KL
+        neg_elbo       = nll+anneal*KL
         if additional is not None:
             additional['hid_out']= hid_out
             additional['nll_mat']= nll_mat
@@ -197,8 +208,6 @@ class DMM(BaseModel, object):
             additional['nll_feat']= nll_mat.sum((0,2))
             additional['nll']    = nll
             additional['kl']     = KL
-            additional['b_mu']   = B_mu
-            additional['b_cov']  = B_cov
             additional['mu_q']   = mu_q
             additional['cov_q']  = cov_q
             additional['z_q']    = z_q
@@ -330,7 +339,7 @@ class DMM(BaseModel, object):
         if suffix=='r':
             lstm_output = lstm_output[::-1]
         return self._dropout(lstm_output, dropout_prob)
-    def _q_z_x(self, X, U = None, B = None, maxTmask = None, dropout_prob = 0., anneal =1.):
+    def _q_z_x(self, X, U = None, B = None,  mask = None, dropout_prob = 0., anneal =1.):
         """
         Inference
         X: nbatch x time x dim_observations 
@@ -338,15 +347,15 @@ class DMM(BaseModel, object):
         """
         self._p('Building with RNN dropout:'+str(dropout_prob))
         embedding         = self._LinearNL(self.tWeights['q_W_input_0'],self.tWeights['q_b_input_0'], X)
-        h_r               = self._LSTM_RNN_layer(embedding, 'r', temporalMask = maxTmask, dropout_prob = dropout_prob, RNN_SIZE = self.params['rnn_size'])
+        h_r               = self._LSTM_RNN_layer(embedding, 'r', temporalMask = mask, dropout_prob = dropout_prob, RNN_SIZE = self.params['rnn_size'])
         if self.params['inference_model']=='LR':
-            h_l           = self._LSTM_RNN_layer(embedding, 'l', temporalMask = maxTmask, dropout_prob = dropout_prob, RNN_SIZE = self.params['rnn_size'])
+            h_l           = self._LSTM_RNN_layer(embedding, 'l', temporalMask = mask, dropout_prob = dropout_prob, RNN_SIZE = self.params['rnn_size'])
             hidden_state  = (h_r+h_l)/2.
         elif self.params['inference_model']=='R':
             hidden_state  = h_r
         else:
             raise ValueError('Bad inference model')
-        z_q, mu_q, cov_q  = self._aggregateLSTM(hidden_state, B = B, anneal = anneal)
+        z_q, mu_q, cov_q  = self._aggregateLSTM(hidden_state)
         return z_q, mu_q, cov_q
     #"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""#
 
@@ -407,7 +416,7 @@ class DMM(BaseModel, object):
         fxn_inputs = [idx]
         if not self.params['validate_only']:
             traindict  = {}
-            train_cost = self._neg_elbo(X, B, M, maxTmask, U = U, anneal = anneal, dropout_prob = self.params['rnn_dropout'], additional=traindict)
+            train_cost = self._neg_elbo(X, M, anneal = anneal, dropout_prob = self.params['rnn_dropout'], additional=traindict)
             model_params             = self._getModelParams()
             optimizer_up, norm_list  = self._setupOptimizer(train_cost, model_params,lr = lr,
                                                             reg_type =self.params['reg_type'],
@@ -426,7 +435,7 @@ class DMM(BaseModel, object):
         Setup functions to evaluate the model
         """
 	evaldict                 = {}
-        eval_cost                = self._neg_elbo(X, B, M, maxTmask, U = U, anneal = 1., dropout_prob = 0., additional= evaldict)
+        eval_cost                = self._neg_elbo(X, M, anneal = 1., dropout_prob = 0., additional= evaldict)
         self.evaluate            = theano.function([idx], eval_cost, name = 'Evaluate Bound',allow_input_downcast=True)
         self.nll_feat            = theano.function([idx],evaldict['nll_mat'], name = 'NLL features',allow_input_downcast=True)
         self.nll_batch           = theano.function([idx],[evaldict['hid_out'],evaldict['nll_mat']], name = 'NLL batch',allow_input_downcast=True)
