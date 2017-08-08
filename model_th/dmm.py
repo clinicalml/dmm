@@ -35,12 +35,8 @@ class DMM(BaseModel, object):
 
     def _createGenerativeParams(self, npWeights):
         """ Create weights/params for generative model """
-        npWeights['B_mu_W']  = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
-        npWeights['B_cov_W'] = self._getWeight((self.params['dim_baselines'], self.params['dim_stochastic']))
-
         DIM_HIDDEN     = self.params['dim_hidden']
         DIM_STOCHASTIC = self.params['dim_stochastic']
-
         """
         Transition Function _ MLP 
         """
@@ -73,7 +69,7 @@ class DMM(BaseModel, object):
                 dim_input = self.params['dim_stochastic']
             npWeights['p_emis_W_'+str(l)] = self._getWeight((dim_input, dim_output))
             npWeights['p_emis_b_'+str(l)] = self._getWeight((dim_output,))
-        lif self.params['data_type'] == 'real':
+        if self.params['data_type'] == 'real':
             dim_out = self.params['dim_observations']*2
         elif self.params['data_type'] == 'binary':
             dim_out  = self.params['dim_observations']
@@ -145,7 +141,7 @@ class DMM(BaseModel, object):
                 hid_g = self._LinearNL(trans_params['p_trans_gate_W_'+str(l)],trans_params['p_trans_gate_b_'+str(l)],hid_g)
         mu_prop= T.dot(hid, trans_params['p_trans_W_mu']) + trans_params['p_trans_b_mu']
         if self.params['transition_type']=='gated':
-            gate   = T.nnet.sigmoid(T.dot(hid_g, trans_params['p_trans_gate_W'))
+            gate   = T.nnet.sigmoid(T.dot(hid_g, trans_params['p_trans_gate_W']))
             mu     = gate*mu_prop + (1-gate)*T.dot(z, trans_params['p_trans_z_W']) 
         else:
             mu     = mu_prop
@@ -255,11 +251,7 @@ class DMM(BaseModel, object):
             return z_f, mu_f, cov_f
         # eps: [T x bs x dim_stochastic]
         eps         = self.srng.normal(size=(hidden_state.shape[0],hidden_state.shape[1],self.params['dim_stochastic']))
-        B_mu        = T.dot(B, self.tWeights['B_mu_W'])
-        B_cov       = T.nnet.softplus(T.dot(B, self.tWeights['B_cov_W']))
-        z0          = B_mu + T.sqrt(B_cov)*self.srng.normal(size=B_mu.shape)
-        #else:
-        #    z0          = T.zeros((eps.shape[1], self.params['dim_stochastic']))
+        z0          = self.srng.normal(size=(eps.shape[1], eps.shape[-1]))
         if self.params['use_generative_prior'] == 'true':
             non_seq = [self.tWeights[k] for k in ['q_W_mu','q_b_mu','q_W_cov','q_b_cov']]+[self.tWeights[k] for k in self.tWeights if '_trans_' in k]
             step_fxn= st_true
@@ -294,13 +286,13 @@ class DMM(BaseModel, object):
             c = c_new*obs_t+ (1-obs_t)*c_
             h_new = o * T.tanh(c)
             h = h_new*obs_t+ (1-obs_t)*h_
+            return h, c  
 
         def _rnn_layer(x_, t_m_, h_, lstm_U):
             h_next  = T.dot(h_, lstm_U) + x_
             obs_t = t_m_[:,None]
             h_out   = obs_t*(T.tanh(h_next)) + (1-obs_t)*h_
             return h_out 
-        assert self.params['rnn_layers']==1,'Only 1/2 layer LSTM supported'
         rnn_cell       = self.params['rnn_cell']
         if rnn_cell=='lstm':
             stepfxn    = _lstm_layer
@@ -339,7 +331,7 @@ class DMM(BaseModel, object):
         if suffix=='r':
             lstm_output = lstm_output[::-1]
         return self._dropout(lstm_output, dropout_prob)
-    def _q_z_x(self, X, U = None, B = None,  mask = None, dropout_prob = 0., anneal =1.):
+    def _q_z_x(self, X, mask = None, dropout_prob = 0., anneal =1.):
         """
         Inference
         X: nbatch x time x dim_observations 
@@ -367,7 +359,7 @@ class DMM(BaseModel, object):
             dimlist = self.dimData()
             dim_str = ','.join([str(d) for d in dimlist])
             self._p('Original dim: '+dim_str)
-        newX, newM = dataset['features']['tensor'].astype(config.floatX), dataset['features']['obs_tensor'].astype(config.floatX)
+        newX, newM = dataset['tensor'].astype(config.floatX), dataset['mask'].astype(config.floatX)
         self.setData(newX=newX, newMask = newM)
         if not quiet:
             dimlist = self.dimData()
@@ -377,26 +369,30 @@ class DMM(BaseModel, object):
     """ Building Model """
     def _buildModel(self):
         """ 
-        This function contains high level function to build and setup theano functions to perform 
-        various actions within the DMM such as updating parameters using data in a batch
+        This function builds high level function to build and setup theano functions: 
         """
         idx                = T.vector('idx',dtype='int64')
-        idx.tag.test_value = np.array([0,1]).astype('int64')
-        X_init             = np.random.uniform(0,1,size=(3,5,self.params['dim_observations'])).astype(config.floatX)
         """ Setup tags for debugging """
-        M_init             = ((X_init>0.5)*1.).astype(config.floatX) 
-        M_init[0,4:,:] = 0.
-        M_init[0,1,:] = 0.
-        M_init[1,2:,:] = 0.
-        self.dataset       = theano.shared(X_init, name = 'X')
-        self.mask          = theano.shared(M_init, name = 'M')
+        idx_tag            = np.array([0,1]).astype('int64')
+        idx.tag.test_value = idx_tag
 
-        X                = self.dataset[idx]
-        M                = self.mask[idx]
+        X_init             = np.random.uniform(0,1,size=(3,5,self.params['dim_observations'])).astype(config.floatX)
+        M_init             = np.ones_like(X_init[:,:,0]).astype(config.floatX) 
+        M_init[0,4:] = 0.
+        M_init[1,1:] = 0.
+        M_init[2,2:] = 0.
+
+        self.dataset       = theano.shared(X_init, name = 'dataset')
+        self.mask          = theano.shared(M_init, name = 'mask')
+        self.dataset.tag.test_value = X_init
+        self.mask.tag.test_value    = M_init
+
+        X                  = self.dataset[idx]
+        M                  = self.mask[idx]
         newX, newMask      = T.tensor3('newX',dtype=config.floatX), T.matrix('newMask',dtype=config.floatX)
         inputs_set         = [newX, newMask]
         updates_set        = [(self.dataset,newX), (self.mask,newMask)]
-        outputs_dim        = [self.dataset.shape, self.mask.shape, self.dataset_b.shape, self.maskT.shape]  
+        outputs_dim        = [self.dataset.shape, self.mask.shape]  
         self.setData       = theano.function(inputs_set, None, updates=updates_set)
         self.dimData       = theano.function([],outputs_dim)
 
@@ -431,9 +427,7 @@ class DMM(BaseModel, object):
                 norm_list[2], traindict['nll'], traindict['kl'], anneal.sum()], updates = optimizer_up, name='Train (with Debug Outputs)')
         #Updates ack
         self.updates_ack         = True
-        """
-        Setup functions to evaluate the model
-        """
+        """ Setup functions to evaluate the model """
 	evaldict                 = {}
         eval_cost                = self._neg_elbo(X, M, anneal = 1., dropout_prob = 0., additional= evaldict)
         self.evaluate            = theano.function([idx], eval_cost, name = 'Evaluate Bound',allow_input_downcast=True)
@@ -452,7 +446,7 @@ if __name__=='__main__':
     """ use this to check compilation for various options"""
     from parse_args import params
     params['data_type']         = 'binary'
-    params['dim_observations']  = 10
+    params['dim_observations']  = 88 
     dmm = DMM(params, paramFile = 'tmp')
     os.unlink('tmp')
     import ipdb;ipdb.set_trace()

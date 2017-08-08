@@ -10,7 +10,7 @@ dataset = load(params['dataset'])
 params['savedir']+='-'+params['dataset']
 createIfAbsent(params['savedir'])
 
-for k in ['dim_observations','dim_actions','data_type']:
+for k in ['dim_observations','data_type']:
     params[k] = dataset[k]
 mapPrint('Options: ',params)
 
