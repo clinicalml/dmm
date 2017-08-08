@@ -26,12 +26,10 @@ Hyperparameters for the Generative Model
 """
 parser.add_argument('-ds','--dim_stochastic', action='store',default = 100, help='Dimensions of latent state', type=int)
 parser.add_argument('-dh','--dim_hidden', action='store', default = 200, help='Hidden dimensions of MLP used in the DMM', type=int)
-
 parser.add_argument('-tl','--transition_layers', action='store', default = 2, 
         help='Number of layers in the MLPs in the transition fxn. Set to 0 (with transition_type = mlp) for a linear transition function', type=int)
 parser.add_argument('-ttype','--transition_type', action='store', default = 'mlp', 
         help='Choice of transition function', type=str, choices=['mlp','gated'])
-
 parser.add_argument('-el','--emission_layers', action='store',default = 2, help='Number of layers in the MLP in the emission function. Set to 0 for a linear emission',type=int)
 
 """
