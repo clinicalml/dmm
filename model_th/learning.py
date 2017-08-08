@@ -14,7 +14,7 @@ def learn(dmm, dataset, epoch_start=0, epoch_end=1000,
     savefile: <str> Savefile for intermediate results
     """
     assert not dmm.params['validate_only'],'cannot run function in validate only mode'
-    N         = dataset['features']['tensor'].shape[0]
+    N         = dataset['tensor'].shape[0]
     idxlist   = range(N)
     batchlist = np.split(idxlist, range(batch_size,N,batch_size))
     bound_train_list, bound_valid_list = [],[]
@@ -35,10 +35,10 @@ def learn(dmm, dataset, epoch_start=0, epoch_end=1000,
                 import ipdb;ipdb.set_trace()
             bound  += batch_bound
             if epoch%epfreq==0 and bnum%10==0:
-                bval = batch_bound/float(dataset['features']['obs_tensor'][batch_idx].sum())
+                bval = batch_bound/float(dataset['mask'][batch_idx].sum())
                 dmm._p(('Bnum: %d, Batch Bound: %.4f, |w|: %.4f, |dw|: %.4f, |w_opt|: %.4f')%(bnum,bval,p_norm, g_norm, opt_norm)) 
                 dmm._p(('-veCLL:%.4f, KL:%.4f, anneal:%.4f')%(negCLL, KL, anneal))
-        bound /= float(dataset['features']['obs_tensor'].sum())
+        bound /= float(dataset['mask'].sum())
         bound_train_list.append((epoch,bound))
         end_time   = time.time()
         if epoch%epfreq==0:

@@ -25,10 +25,10 @@ for dset in all_datasets:
     all_expts[dset] = OrderedDict()
 
 #Experiments to run for each dataset
-all_expts['jsb']['DKF-ar']        ='python2.7 train.py -vm R -infm structured -ar 5000 -dset <dataset>' 
-all_expts['nottingham']['DKF-ar'] ='python2.7 train.py -vm R -infm structured -ar 5000 -dset <dataset>' 
-all_expts['musedata']['DKF-ar']   ='python2.7 train.py -vm R -infm structured -ar 5000 -dset <dataset>' 
-all_expts['piano']['DKF-ar']      ='python2.7 train.py -vm R -infm structured -ar 5000 -dset <dataset>' 
+all_expts['jsb']['DKF-ar']        ='python2.7 train.py -infm R -ar 2000 -dset <dataset>' 
+all_expts['nottingham']['DKF-ar'] ='python2.7 train.py -infm R -ar 2000 -dset <dataset>' 
+all_expts['musedata']['DKF-ar']   ='python2.7 train.py -infm R -ar 2000 -dset <dataset>' 
+all_expts['piano']['DKF-ar']      ='python2.7 train.py -infm R -ar 2000 -dset <dataset>' 
 
 for name in all_expts[dataset]:
     runcmd  = all_expts[dataset][name].replace('<dataset>',DATASET)+' -uid '+name

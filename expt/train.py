@@ -52,16 +52,14 @@ start_time= time.time()
 """
 Training loop
 """
-savedata = DMM_learn.learn(dmm, dataset['train'], dataset['mask_train'], 
+savedata = DMM_learn.learn(dmm, dataset['train'],
                                 epoch_start =0 , 
                                 epoch_end = params['epochs'], 
                                 batch_size = params['batch_size'],
                                 savefreq   = params['savefreq'],
                                 savefile   = savef,
                                 dataset_eval=dataset['valid'],
-                                mask_eval  = dataset['mask_valid'],
-                                replicate_K= params['replicate_K'],
-                                shuffle    = False
+                                shuffle    = True
                                 )
 displayTime('Running DMM',start_time, time.time()         )
 
