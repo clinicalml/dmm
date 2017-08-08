@@ -61,7 +61,7 @@ to obtain a scalable method for performing probabilistic inference over the late
     * `sample()` returns the result of ancestral sampling in the model
 
 ### Model Parameters
-The DMM has hyper-parameters specified in [`parse_args.py`](../parse_args.py). 
+* The DMM has hyper-parameters specified in [`parse_args.py`](../parse_args.py). 
 These dictate aspects of the model that control the number and sizes of the model parameters. 
-To find out more about each parameter type `python parse_args.py -h`
+* To find out more about each parameter run `python parse_args.py -h`
 
