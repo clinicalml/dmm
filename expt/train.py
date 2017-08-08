@@ -49,9 +49,7 @@ savef     = os.path.join(params['savedir'],params['unique_id'])
 print 'Savefile: ',savef
 start_time= time.time()
 
-"""
-Training loop
-"""
+""" Training loop """
 savedata = DMM_learn.learn(dmm, dataset['train'],
                                 epoch_start =0 , 
                                 epoch_end = params['epochs'], 
@@ -77,6 +75,6 @@ dmm_best                         = DMM(params, paramFile = pfile, reloadFile = r
 Evaluate on the test set
 """
 additional                       = {}
-savedata['bound_test']      = DMM_evaluate.evaluateBound(dmm_best,  dataset['test'], dataset['mask_test'], S = 2, batch_size = params['batch_size'], additional =additional) 
+savedata['bound_test']      = DMM_evaluate.evaluateBound(dmm_best,  dataset['test'], batch_size = params['batch_size'])
 saveHDF5(savef+'-final.h5',savedata)
 print 'Experiment Name: <',params['expt_name'],'> Test Bound: ',savedata['bound_test']

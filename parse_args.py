@@ -97,3 +97,6 @@ for k in hmap:
 params['expt_name'] = params['unique_id']
 params['unique_id'] = combined[:-1]+'-'+params['unique_id']
 params['unique_id'] = 'DMM_'+params['unique_id'].replace('.','_')
+
+#from utils.misc import savePickle
+#savePickle([params],'default.pkl')
