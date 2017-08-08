@@ -29,6 +29,7 @@ class DMM(BaseModel, object):
     def _createParams(self):
         """ Model parameters """
         npWeights = OrderedDict()
+        np.random.seed(self.params['seed'])
         self._createInferenceParams(npWeights)
         self._createGenerativeParams(npWeights)
         return npWeights
