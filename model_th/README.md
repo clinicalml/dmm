@@ -43,11 +43,16 @@ to obtain a scalable method for performing probabilistic inference over the late
     * The function `resetDataset` is used for changing the dataset dynamically at train/validation time.  
 * **Step 3** Setup Training Cost
     * In [`_buildModel(self)`](dmm.py#L417-L430), we setup the computational graph used for training. 
-    * The function `_neg_elbo`  
+    * The function [`_neg_elbo()`](dmm.py#L175) returns the upper bound we minimize. It has a few core components described below:
+        * [`_q_z_x()`](dmm.py#L333): Given the data, this function uses RNN's to 
+        estimate the parameters of the variational posterior distribution
+        * [`_transition()`](dmm.py#L133): Given a tensor or matrix representing the model's latent state (dimensions `Nsamples x T x dim_stochastic` or `Nsamples x dim_stochastic`), this function computes the result of applying the transition function on the provided latent state. 
+        * [`_emission()`](dmm.py#L146): Given a tensor or matrix representing the model's latent state, this function returns the result of applying the emission function on the provided latent state.  
+        * [`_temporalKL()`](dmm.py#L162): This function computes the KL divergence between the variational posterior and the prior. 
 * **Step 4** Setup Evaluation Functions 
     * In [`_buildModel(self)`](dmm.py#L437-L448), we define the theano functions used to evaluate the model. 
 
-## [Learning](learning.py) and [Evaluation](evaluate.py) scripts
+### [Learning](learning.py) and [Evaluation](evaluate.py) scripts
 * [`learning.py`](learning.py) contains a simple training loop that tracks the validation loss occastionally 
 * [`evaluate.py`](evaluate.py) contain helper functions to perform tasks on a model from a previous savefile 
     * `infer()` allows you to estimate the posterior distribution as fit by the inference network  
@@ -55,7 +60,7 @@ to obtain a scalable method for performing probabilistic inference over the late
     * `evaluateBound()` lets you estimate the upper bound on -log p(x) on a dataset
     * `sample()` returns the result of ancestral sampling in the model
 
-## Model Parameters
+### Model Parameters
 The DMM has hyper-parameters specified in [`parse_args.py`](../parse_args.py). 
 These dictate aspects of the model that control the number and sizes of the model parameters. 
 To find out more about each parameter type `python parse_args.py -h`

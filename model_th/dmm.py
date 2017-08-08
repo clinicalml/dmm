@@ -175,14 +175,8 @@ class DMM(BaseModel, object):
     def _neg_elbo(self, X, B, M, maxTmask, U = None, anneal = 1., dropout_prob = 0., additional = None):
         z_q, mu_q, cov_q   = self._q_z_x(X, U= U, B=B, maxTmask = maxTmask, dropout_prob = dropout_prob, anneal = anneal)
         mu_trans, cov_trans= self._transition(z_q)
-        """ Initial prior distribution """
-        B_mu               = T.dot(B, self.tWeights['B_mu_W'])[:,None,:] 
-        B_cov              = T.nnet.softplus(T.dot(B, self.tWeights['B_cov_W']))[:,None,:]
-        if self.params['fixed_init_prior']:
-            B_mu = B_mu*0.
-            B_cov= B_cov*0.+1.
-        mu_prior           = T.concatenate([B_mu, mu_trans[:,:-1,:]], axis=1)
-        cov_prior          = T.concatenate([B_cov,cov_trans[:,:-1,:]],axis=1)
+        mu_prior           = T.concatenate([T.zeros_like(mu_trans[:,[0],:]), mu_trans[:,:-1,:]], axis=1)
+        cov_prior          = T.concatenate([T.ones_like(mu_trans[:,[0],:]),cov_trans[:,:-1,:]],axis=1)
         KL                 = self._temporalKL(mu_q, cov_q, mu_prior, cov_prior, maxTmask = maxTmask)
         hid_out            = self._emission(z_q)
 	params             = {}
@@ -193,9 +187,6 @@ class DMM(BaseModel, object):
             nll_mat        = self._nll_gaussian(hid_out[:,:,:dim_obs], hid_out[:,:,dim_obs:dim_obs*2], X, mask = M, params=params)
         else:
             raise ValueError('Invalid Data Type'+str(self.params['data_type']))
-        #if dropout_prob>0:
-        #    nll            = nll_mat.sum()+sim_reg
-        #else:
         nll            = nll_mat.sum()
         #Evaluate negative ELBO
         neg_elbo       = nll+KL
