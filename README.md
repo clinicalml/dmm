@@ -52,7 +52,11 @@ and pointers to portions of the code.
 for an explanation of what the various choices of parameters change in the generative model and inference network.  
 * [`expt`](expt/): Experimental setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
 * [`expt_template`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
-* [`dmm_data`](dmm_data/) : Setting up datasets for the model to work with. Add or change code in `load.py`(dmm_data/load.py) to run the model on your own data. This [Ipython notebook]('ipynb/DMM-Setup.ipynb') contains details on the setup and formatting of datasets. 
+* [`dmm_data`](dmm_data/) : Setting up datasets for the model to work with. Add or change code in `load.py`(dmm_data/load.py) to run the model on your own data. 
+
+## Running the model on your data
+* A general purpose tutorial for setting up and running the model can be found in the [IPython Notebooks](ipynb/).
+* The code currently supports binary and real-valued data. An example of modeling binary data may be found in [`expt/`](expt/). 
 
 ## References: 
 Please cite the following paper if you find the code useful in your research: 
