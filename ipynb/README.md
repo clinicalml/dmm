@@ -1,5 +1,7 @@
 ## IPython Notebooks
 
-This folder contains notebooks that setup and learn DMMs from synthetic data. 
+This folder contains notebooks that details the procedure to setup datasets and learn DMMs:
 
-* [Synthetic Data](DeepMarkovModels-Synthetic.ipynb): Learning DMMs on your own synthetic data
+* [Setup](DMM-setup.ipynb) : Setup for datasets and learning DMMs
+* [Reloading Models](DMM-reload.ipynb) : Reloading models from saved checkpoints 
+* [Visualizing the Learned Model](DMM-viz.ipynb) : Visualizing training and validation results as well as samples from the model 

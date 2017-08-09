@@ -34,9 +34,8 @@ and pointers to portions of the code.
 * [`parse_args.py`](parse_args.py): This file contains hyperparameters used by the model. Run `python parse_args.py -h` 
 for an explanation of what the various choices of parameters change in the generative model and inference network.  
 * [`expt`](expt/): Experimental setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
-* [`expt_template/`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
-* [`dmm_data/`](dmm_data/) : Setting up datasets for the model to work with. Add code in this folder to run the model on your own data.
-Follow instructions in the Ipython notebooks regarding formatting of datasets. 
+* [`expt_template`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
+* [`dmm_data`](dmm_data/) : Setting up datasets for the model to work with. Add or change code in `load.py`(dmm_data/load.py) to run the model on your own data. This [Ipython notebook]('ipynb/DMM-Setup.ipynb') contains details on the setup and formatting of datasets. 
 
 ## References: 
 Please cite the following paper if you find the code useful in your research: 
