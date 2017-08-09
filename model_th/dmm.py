@@ -439,6 +439,7 @@ class DMM(BaseModel, object):
             self.emission_fxn        = theano.function([evaldict['z_q']], [evaldict['bin_prob']] , name='Emission',allow_input_downcast=True)
         else:
             self.emission_fxn        = theano.function([evaldict['z_q']], [evaldict['real_mu'], evaldict['real_logcov']] , name='Emission',allow_input_downcast=True)
+        evaldict['z_q'].name = 'Z'
         self.transition_fxn = theano.function([evaldict['z_q']], [evaldict['mu_t'], evaldict['cov_t']], name='Transition Function',allow_input_downcast=True)
         self.posterior_inference_data = theano.function([X,M], [evaldict['z_q'], evaldict['mu_q'], evaldict['cov_q']], name='Posterior Inference',allow_input_downcast=True)
         self._p('Completed DMM setup')

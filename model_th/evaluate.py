@@ -41,24 +41,24 @@ def evaluateBound(dmm, dataset, batch_size=100):
 def sample(dmm, nsamples=100, T=20, additional = {}, stochastic = True):
     """ Sample from Generative Model """
     assert T>1, 'Sample atleast 2 timesteps'
-    mu0       = np.zeros((nsamples, dmm.params['dim_stochastic']))
+    mu0       = np.zeros((nsamples, 1, dmm.params['dim_stochastic']))
     cov0      = np.ones_like(mu0)
     if stochastic:
         z       = sampleGaussian(mu0, np.log(cov0))
     else:
         z       = mu0
-    all_zs  = [np.copy(z)[:,None,:]]
-    mulist  = [mu0[:,None,:]]
-    covlist = [cov0[:,None,:]]
+    all_zs  = [np.copy(z)]
+    mulist  = [mu0]
+    covlist = [cov0]
     for t in range(T-1):
         mu, cov  = dmm.transition_fxn(Z = z)
         if stochastic:
             z        = sampleGaussian(mu,np.log(cov))
         else:
             z        = mu 
-        all_zs.append(np.copy(z)[:,None,:])
-        mulist.append(np.copy(mu)[:,None,:])
-        covlist.append(np.copy(cov)[:,None,:])
+        all_zs.append(np.copy(z))
+        mulist.append(np.copy(mu))
+        covlist.append(np.copy(cov))
     zvec                        = np.concatenate(all_zs,axis=1)
     additional['mu_sample']     = np.concatenate(mulist, axis=1)
     additional['cov_sample']    = np.concatenate(covlist, axis=1)
