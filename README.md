@@ -26,6 +26,23 @@ This package has the following requirements:
     * Wrapper around theano that takes care of bookkeeping, saving/loading models etc. Clone the github repository and add its location to the PYTHONPATH environment variable so that it is accessible by python.
 * An NVIDIA GPU w/ atleast 6G of memory is recommended.
 
+## Optional
+I used the following `~/.theanorc` configuration file:
+```
+[global]
+floatX=float32
+
+[mode]=FAST_RUN
+
+[nvcc]
+fastmath=True
+
+[cuda]
+root=/usr/local/cuda
+```
+
+You can change whether the model is run on the GPU or CPU by modifying the `THEANO_FLAGS`. See [here](http://deeplearning.net/software/theano/library/config.html) for documentation.
+
 ## Folders 
 * [`model_th`](model_th/): This folder contains raw theano code implementing the model. See the folder for details on how the DMM was implementation
 and pointers to portions of the code. 
