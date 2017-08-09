@@ -9,11 +9,11 @@ The code uses variational inference during learning to maximize the likelihood o
 <p align="center"><img src="images/ELBO.png" width="500" height="70" alt="Evidence Lower Bound"></p>
 
 * Generative Model
-    * The latent variables z1...zT and the observations x1...xT describe the generative process for the data.
     * The figure depicts a state space model for time-varying data. 
+    * The latent variables `z1...zT` and the observations `x1...xT` together describe the generative process for the data.
     * The emission `p(x_t|z_t)` and transition functions `p(z_t|z_{t-1})` are parameterized by deep neural networks
 * Inference Model
-    * The box q(z1..zT | x1...xT) represents the inference network
+    * The function `q(z1..zT | x1...xT)` represents the inference network
     * This is a parametric approximation to the variational posterior used for learning at training time
     and for inference at test time. 
 
