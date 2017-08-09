@@ -31,9 +31,12 @@ This package has the following requirements:
 and pointers to portions of the code. 
 * [`dmm_data`](dmm_data/): This folder contains code to load the polyphonic music data and a synthetic dataset. 
 * [`ipynb`](ipynb/): This folder contains some IPython notebooks with examples on loading and running the model on your own data.  
-* [`parse_args.py`](parse_args.py): This file contains hyperparameters used by the model. See the [`README.md`](model/README.md) for an explanation of 
-what the various choices of parameters change in the generative model and inference network.  
-* [`expt`](expt/): Setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
+* [`parse_args.py`](parse_args.py): This file contains hyperparameters used by the model. Run `python parse_args.py -h` 
+for an explanation of what the various choices of parameters change in the generative model and inference network.  
+* [`expt`](expt/): Experimental setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
+* [`expt_template/`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
+* [`dmm_data/`](dmm_data/) : Setting up datasets for the model to work with. Add code in this folder to run the model on your own data.
+Follow instructions in the Ipython notebooks regarding formatting of datasets. 
 
 ## References: 
 Please cite the following paper if you find the code useful in your research: 
