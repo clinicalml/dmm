@@ -22,7 +22,7 @@ This package has the following requirements:
 * `python2.7`
 * [Theano](https://github.com/Theano/Theano)
     * Used for automatic differentiation
-* [theanomodels] (https://github.com/clinicalml/theanomodels) 
+* [theanomodels](https://github.com/clinicalml/theanomodels) 
     * Wrapper around theano that takes care of bookkeeping, saving/loading models etc. Clone the github repository and add its location to the PYTHONPATH environment variable so that it is accessible by python.
 * An NVIDIA GPU w/ atleast 6G of memory is recommended.
 
