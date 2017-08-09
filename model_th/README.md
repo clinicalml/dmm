@@ -44,7 +44,7 @@ To create the model in Theano, we follow the steps detailed below:
     * The data is subsampled using a vector of indices `idx`. This is used to slice the data yielding `X` a 3D tensor of size `Nsamples x maxT x dim_observations` and a mask `M` -- a matrix of dimensions `Nsamples x maxT` where a one denotes that the time-step is observed.  
 * **Step 3** Setup Training Cost
     * In [`_buildModel(self)`](dmm.py#L414-L428), we setup the computational graph used for training. 
-    * The function [`_neg_elbo()`](dmm.py#L181) returns the upper bound we minimize. It has a few core components described below:
+    * The function [`_neg_elbo()`](dmm.py#L181-L200) returns the upper bound we minimize. It has a few core components described below:
         * [`_q_z_x()`](dmm.py#L335-L352): Given the data `X`, this function uses RNN's to approximate the variational parameters for `q(z1...zT|x1...xT)`. 
         * [`_transition()`](dmm.py#L131-L150): Used to compute `p(z_t|z_{t-1})`. Given a tensor or matrix representing the model's latent state (dimensions `Nsamples x T x dim_stochastic` or `Nsamples x dim_stochastic`) `z_t`, this function computes the result of applying the transition function to it. 
         * [`_emission()`](dmm.py#L152-L162): Used to compute `p(x_t|z_t)`. Given a tensor or matrix representing the model's latent state `z_t`, this function returns an intermediate hidden state used to compute the distributional parameters of the data resulting from applying the emission function on the provided latent state.
