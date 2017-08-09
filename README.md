@@ -3,7 +3,7 @@
 ## Overview 
 This repository contains theano code for implementing Deep Markov Models. The code is documented and should be easy to modify for your own applications. 
 
-<p align="center"><img src="images/dkf.png" alt="Deep Markov Model" width="300"></p>
+<p align="center"><img src="images/dmm.png" alt="Deep Markov Model" width="300"></p>
 
 The code uses variational inference during learning to maximize the likelihood of the observed data:
 <p align="center"><img src="images/ELBO.png" width="500" height="70" alt="Evidence Lower Bound"></p>
