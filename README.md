@@ -44,15 +44,14 @@ root=/usr/local/cuda
 You can change whether the model is run on the GPU or CPU by modifying the `THEANO_FLAGS`. See [here](http://deeplearning.net/software/theano/library/config.html) for documentation.
 
 ## Folders 
-* [`model_th`](model_th/): This folder contains raw theano code implementing the model. See the folder for details on how the DMM was implementation
+* **Model Code**: [`model_th`](model_th/): This folder contains raw theano code implementing the model. See the folder for details on how the DMM was implementation
 and pointers to portions of the code. 
-* [`dmm_data`](dmm_data/): This folder contains code to load the polyphonic music data and a synthetic dataset. 
-* [`ipynb`](ipynb/): This folder contains some IPython notebooks with examples on loading and running the model on your own data.  
-* [`parse_args.py`](parse_args.py): This file contains hyperparameters used by the model. Run `python parse_args.py -h` 
+* **Datasets**: [`dmm_data`](dmm_data/): This folder contains code to load the polyphonic music data and a synthetic dataset. Add or change code in `load.py`(dmm_data/load.py) to run the model on your own data. 
+* **Tutorials**: [`ipynb`](ipynb/): This folder contains some IPython notebooks with examples on loading and running the model on your own data.  
+* **Hyperparameters**: [`parse_args.py`](parse_args.py): This file contains hyperparameters used by the model. Run `python parse_args.py -h` 
 for an explanation of what the various choices of parameters change in the generative model and inference network.  
-* [`expt`](expt/): Experimental setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
-* [`expt_template`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
-* [`dmm_data`](dmm_data/) : Setting up datasets for the model to work with. Add or change code in `load.py`(dmm_data/load.py) to run the model on your own data. 
+* **Modeling Polyphonic Music**: [`expt`](expt/): Experimental setup for running the DMM on the [polyphonic music dataset](http://www-etud.iro.umontreal.ca/~boulanni/icml2012) 
+* **Template Folder for Training DMMs**: [`expt_template`](expt_template/) : Experimental setup for running the DMM on synthetic real-valued observations. 
 
 ## Running the model on your data
 * A general purpose tutorial for setting up and running the model can be found in the [IPython Notebooks](ipynb/).
