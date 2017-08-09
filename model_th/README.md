@@ -38,7 +38,7 @@ To create the model in Theano, we follow the steps detailed below:
     * With initialized model parameters, we can create the computational flow graph that takes as input the raw data and returns the model's reconstruction of the data.
 * **Step 2** Save dataset in memory 
     * The dataset and the masks (to denote whether an observation `x_t` is valid for different choices of `t`) are stored 
-    in theano shared variables. This is done in [`_buildModel(self)`](dmm.py#L375-398) 
+    in theano shared variables. This is done in [`_buildModel(self)`](dmm.py#L375-L398) 
     * The data is loaded onto [shared variables](dmm.py#L386-L387) in memory to speed up training and evaluation. 
     * The function `resetDataset()` can be used for changing the dataset dynamically at train/validation time. 
     * The data is subsampled using a vector of indices `idx`. This is used to slice the data yielding `X` a 3D tensor of size `Nsamples x maxT x dim_observations` and a mask `M` -- a matrix of dimensions `Nsamples x maxT` where a one denotes that the time-step is observed.  
