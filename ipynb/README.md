@@ -6,5 +6,6 @@ for working with the model. The running example here is a randomly generated toy
 * [Setup](DMM-Setup.ipynb) : Setup for datasets and learning DMMs
 * [Reloading Models](DMM-Reload.ipynb) : Reloading models from saved checkpoints 
 * [Visualizing the Learned Model](DMM-Viz.ipynb) : Visualizing training and validation results as well as samples from the model 
+* [Polyphonic Music](DMM-Midi.ipynb) : Listening to samples from a DMM trained on the polyphonic music dataset 
 
-Hopefully the above is a reasonable starting place to start trying the model on your own data. 
+The above is a reasonable starting place to get started on training and inspecting the model with your own data. 
